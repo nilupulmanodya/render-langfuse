@@ -32,7 +32,7 @@ services:
     image:
       url: clickhouse/clickhouse-server:latest
     region: oregon
-    plan: starter
+    plan: standard
     envVars:
       - key: CLICKHOUSE_DB
         value: default
