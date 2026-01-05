@@ -5,15 +5,14 @@ services:
   - type: pserv
     name: minio
     image: cgr.dev/chainguard/minio:latest
-    region: oregon # Ensure all services are in the same region
+    region: oregon
     plan: starter
-    # Replicates the "mkdir" command from your compose file to auto-create the bucket
     startCommand: "sh -c 'mkdir -p /data/langfuse && minio server --address \":9000\" --console-address \":9001\" /data'"
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
       - key: MINIO_ROOT_PASSWORD
-        generateValue: true # Generates a secure random password
+        generateValue: true
     disk:
       name: minio-data
       mountPath: /data
@@ -26,7 +25,7 @@ services:
     name: clickhouse
     image: clickhouse/clickhouse-server:latest
     region: oregon
-    plan: standard # ClickHouse needs more RAM than Starter offers
+    plan: standard
     envVars:
       - key: CLICKHOUSE_DB
         value: default
@@ -40,7 +39,16 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 3. Langfuse Worker
+  # 3. Redis - Managed Service
+  # (MOVED HERE inside 'services')
+  # -------------------------------------------------------
+  - type: redis
+    name: langfuse-redis
+    region: oregon
+    plan: starter
+
+  # -------------------------------------------------------
+  # 4. Langfuse Worker
   # -------------------------------------------------------
   - type: worker
     name: langfuse-worker
@@ -61,8 +69,8 @@ services:
           type: redis
           name: langfuse-redis
           property: port
-      - key: REDIS_AUTH
-        fromService: # Redis auth string is handled automatically by Render
+      - key: REDIS_AUTH # Render handles Redis auth automatically
+        fromService:
           type: redis
           name: langfuse-redis
           property: password
@@ -96,7 +104,7 @@ services:
         generateValue: true
 
   # -------------------------------------------------------
-  # 4. Langfuse Web (UI)
+  # 5. Langfuse Web (UI)
   # -------------------------------------------------------
   - type: web
     name: langfuse-web
@@ -106,13 +114,10 @@ services:
     healthCheckPath: /api/public/health
     envVars:
       - key: NEXTAUTH_URL
-        value: https://langfuse-web.onrender.com # Update this after first deploy if URL differs
+        value: https://langfuse-web.onrender.com # Update if URL differs
       - key: NEXTAUTH_SECRET
         generateValue: true
-      # ... (Repeat all env vars from Worker here) ...
-      # For brevity in this snippet, you must manually copy 
-      # the DATABASE, REDIS, CLICKHOUSE, and S3 vars from the Worker section above.
-      # Render Blueprints do not currently support YAML anchors for shared env vars.
+      # --- Repeated Envs for Web Service ---
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
@@ -161,14 +166,12 @@ services:
       - key: ENCRYPTION_KEY
         generateValue: true
 
+# -------------------------------------------------------
+# Databases (Postgres is separate from Services)
+# -------------------------------------------------------
 databases:
   - name: langfuse-postgres
     region: oregon
-    plan: standard # Langfuse v3 is heavy on DB
+    plan: standard
     databaseName: langfuse
     user: langfuse
-
-- type: redis
-  name: langfuse-redis
-  region: oregon
-  plan: starter
