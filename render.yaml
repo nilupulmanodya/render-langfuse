@@ -1,0 +1,174 @@
+services:
+  # -------------------------------------------------------
+  # 1. MinIO (S3 Replacement) - Private Service
+  # -------------------------------------------------------
+  - type: pserv
+    name: minio
+    image: cgr.dev/chainguard/minio:latest
+    region: oregon # Ensure all services are in the same region
+    plan: starter
+    # Replicates the "mkdir" command from your compose file to auto-create the bucket
+    startCommand: "sh -c 'mkdir -p /data/langfuse && minio server --address \":9000\" --console-address \":9001\" /data'"
+    envVars:
+      - key: MINIO_ROOT_USER
+        value: minio
+      - key: MINIO_ROOT_PASSWORD
+        generateValue: true # Generates a secure random password
+    disk:
+      name: minio-data
+      mountPath: /data
+      sizeGB: 10
+
+  # -------------------------------------------------------
+  # 2. ClickHouse - Private Service
+  # -------------------------------------------------------
+  - type: pserv
+    name: clickhouse
+    image: clickhouse/clickhouse-server:latest
+    region: oregon
+    plan: standard # ClickHouse needs more RAM than Starter offers
+    envVars:
+      - key: CLICKHOUSE_DB
+        value: default
+      - key: CLICKHOUSE_USER
+        value: clickhouse
+      - key: CLICKHOUSE_PASSWORD
+        generateValue: true
+    disk:
+      name: clickhouse-data
+      mountPath: /var/lib/clickhouse
+      sizeGB: 10
+
+  # -------------------------------------------------------
+  # 3. Langfuse Worker
+  # -------------------------------------------------------
+  - type: worker
+    name: langfuse-worker
+    image: langfuse/langfuse-worker:3
+    region: oregon
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: langfuse-postgres
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: langfuse-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: langfuse-redis
+          property: port
+      - key: REDIS_AUTH
+        fromService: # Redis auth string is handled automatically by Render
+          type: redis
+          name: langfuse-redis
+          property: password
+      - key: CLICKHOUSE_HOST
+        value: http://clickhouse:8123
+      - key: CLICKHOUSE_USER
+        value: clickhouse
+      - key: CLICKHOUSE_PASSWORD
+        fromService:
+          type: pserv
+          name: clickhouse
+          envVarKey: CLICKHOUSE_PASSWORD
+      - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+        value: langfuse
+      - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+        value: http://minio:9000
+      - key: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+        value: minio
+      - key: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+        fromService:
+          type: pserv
+          name: minio
+          envVarKey: MINIO_ROOT_PASSWORD
+      - key: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+        value: "true"
+      - key: LANGFUSE_S3_EVENT_UPLOAD_REGION
+        value: us-east-1
+      - key: SALT
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+  # -------------------------------------------------------
+  # 4. Langfuse Web (UI)
+  # -------------------------------------------------------
+  - type: web
+    name: langfuse-web
+    image: langfuse/langfuse:3
+    region: oregon
+    plan: starter
+    healthCheckPath: /api/public/health
+    envVars:
+      - key: NEXTAUTH_URL
+        value: https://langfuse-web.onrender.com # Update this after first deploy if URL differs
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      # ... (Repeat all env vars from Worker here) ...
+      # For brevity in this snippet, you must manually copy 
+      # the DATABASE, REDIS, CLICKHOUSE, and S3 vars from the Worker section above.
+      # Render Blueprints do not currently support YAML anchors for shared env vars.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: langfuse-postgres
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: langfuse-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: langfuse-redis
+          property: port
+      - key: REDIS_AUTH
+        fromService:
+          type: redis
+          name: langfuse-redis
+          property: password
+      - key: CLICKHOUSE_HOST
+        value: http://clickhouse:8123
+      - key: CLICKHOUSE_USER
+        value: clickhouse
+      - key: CLICKHOUSE_PASSWORD
+        fromService:
+          type: pserv
+          name: clickhouse
+          envVarKey: CLICKHOUSE_PASSWORD
+      - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+        value: langfuse
+      - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+        value: http://minio:9000
+      - key: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+        value: minio
+      - key: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+        fromService:
+          type: pserv
+          name: minio
+          envVarKey: MINIO_ROOT_PASSWORD
+      - key: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+        value: "true"
+      - key: LANGFUSE_S3_EVENT_UPLOAD_REGION
+        value: us-east-1
+      - key: SALT
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+databases:
+  - name: langfuse-postgres
+    region: oregon
+    plan: standard # Langfuse v3 is heavy on DB
+    databaseName: langfuse
+    user: langfuse
+
+- type: redis
+  name: langfuse-redis
+  region: oregon
+  plan: starter
