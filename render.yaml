@@ -4,12 +4,11 @@ services:
   # -------------------------------------------------------
   - type: pserv
     name: minio
-    runtime: image # Explicitly state this is a prebuilt image
+    runtime: image
     image: 
-      url: cgr.dev/chainguard/minio:latest-dev # Use 'dev' tag to get /bin/sh
+      url: cgr.dev/chainguard/minio:latest-dev
     region: oregon
     plan: starter
-    # This command requires the 'dev' image variant to work
     startCommand: "sh -c 'mkdir -p /data/langfuse && minio server --address \":9000\" --console-address \":9001\" /data'"
     envVars:
       - key: MINIO_ROOT_USER
@@ -57,21 +56,12 @@ services:
         fromDatabase:
           name: langfuse-postgres
           property: connectionString
-      - key: REDIS_HOST
+      # FIX: Use full connection string instead of split auth
+      - key: REDIS_CONNECTION_STRING
         fromService:
           type: redis
           name: langfuse-redis
-          property: host
-      - key: REDIS_PORT
-        fromService:
-          type: redis
-          name: langfuse-redis
-          property: port
-      - key: REDIS_AUTH
-        fromService:
-          type: redis
-          name: langfuse-redis
-          property: password
+          property: connectionString
       - key: CLICKHOUSE_HOST
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
@@ -114,29 +104,19 @@ services:
     healthCheckPath: /api/public/health
     envVars:
       - key: NEXTAUTH_URL
-        value: https://langfuse-web.onrender.com # Update if URL differs
+        value: https://langfuse-web.onrender.com
       - key: NEXTAUTH_SECRET
         generateValue: true
-      # --- Repeated Envs for Web Service ---
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
           property: connectionString
-      - key: REDIS_HOST
+      # FIX: Use full connection string for Web too
+      - key: REDIS_CONNECTION_STRING
         fromService:
           type: redis
           name: langfuse-redis
-          property: host
-      - key: REDIS_PORT
-        fromService:
-          type: redis
-          name: langfuse-redis
-          property: port
-      - key: REDIS_AUTH
-        fromService:
-          type: redis
-          name: langfuse-redis
-          property: password
+          property: connectionString
       - key: CLICKHOUSE_HOST
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
@@ -173,6 +153,9 @@ services:
     name: langfuse-redis
     region: oregon
     plan: starter
+    # FIX: Must specify an allow list. Empty list [] denies external IPs 
+    # but still allows internal Render services (like Web/Worker) to connect.
+    ipAllowList: [] 
 
 # -------------------------------------------------------
 # Databases
