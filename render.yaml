@@ -9,8 +9,8 @@ services:
       url: minio/minio:latest
     region: oregon
     plan: starter
-    # FIX: Removed "minio" prefix and quotes. The image entrypoint handles the binary.
-    startCommand: server /data --console-address :9001
+    # FIX: Use /bin/sh to ensure arguments are parsed correctly
+    startCommand: /bin/sh -c "minio server /data --console-address :9001"
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
