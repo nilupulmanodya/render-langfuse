@@ -5,10 +5,11 @@ services:
   - type: pserv
     name: minio
     runtime: image
+    # FIX: Image must be an object with a 'url' key, not a string
     image: 
       url: cgr.dev/chainguard/minio:latest-dev
     region: oregon
-    plan: starter
+    plan: starter # $7/mo
     startCommand: "sh -c 'mkdir -p /data/langfuse && minio server --address \":9000\" --console-address \":9001\" /data'"
     envVars:
       - key: MINIO_ROOT_USER
@@ -29,7 +30,7 @@ services:
     image:
       url: clickhouse/clickhouse-server:latest
     region: oregon
-    plan: standard
+    plan: starter # $7/mo (Note: ClickHouse is heavy; monitor RAM usage)
     envVars:
       - key: CLICKHOUSE_DB
         value: default
@@ -51,6 +52,7 @@ services:
     image:
       url: langfuse/langfuse-worker:3
     region: oregon
+    plan: starter # $7/mo
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -99,7 +101,7 @@ services:
     image:
       url: langfuse/langfuse:3
     region: oregon
-    plan: starter
+    plan: starter # $7/mo
     healthCheckPath: /api/public/health
     envVars:
       - key: NEXTAUTH_URL
@@ -150,7 +152,7 @@ services:
   - type: redis
     name: langfuse-redis
     region: oregon
-    plan: starter
+    plan: starter # $7/mo
     ipAllowList: [] 
 
 # -------------------------------------------------------
@@ -159,6 +161,7 @@ services:
 databases:
   - name: langfuse-postgres
     region: oregon
-    plan: basic # CHANGED: "standard" is legacy. "basic" is the modern equivalent.
+    # The database plan is called "basic" ($7/mo), not "starter"
+    plan: basic 
     databaseName: langfuse
     user: langfuse
