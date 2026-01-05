@@ -1,6 +1,6 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (AWS ECR Mirror)
+  # 1. MinIO
   # -------------------------------------------------------
   - type: pserv
     name: minio
@@ -21,7 +21,7 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Standard Plan + Fixed Password)
+  # 2. ClickHouse
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
@@ -62,14 +62,13 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # FIX: Updated to match your actual internal hostname (clickhouse-euvv)
+      # INTERNAL HOSTNAME PRESERVED: clickhouse-euvv
       - key: CLICKHOUSE_URL
         value: http://clickhouse-euvv:8123
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      # FIX: Updated hostname here as well
       - key: CLICKHOUSE_MIGRATION_URL
         value: clickhouse://default:langfuse_secure_password@clickhouse-euvv:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
@@ -103,7 +102,8 @@ services:
     image:
       url: langfuse/langfuse:3
     region: oregon
-    plan: starter
+    # FIX: Upgraded to 'standard' (2GB RAM) to fix Heap Out of Memory crash
+    plan: standard 
     healthCheckPath: /api/public/health
     envVars:
       - key: NEXTAUTH_URL
@@ -119,14 +119,13 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # FIX: Updated to match your actual internal hostname
+      # INTERNAL HOSTNAME PRESERVED: clickhouse-euvv
       - key: CLICKHOUSE_URL
         value: http://clickhouse-euvv:8123
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      # FIX: Updated hostname here as well
       - key: CLICKHOUSE_MIGRATION_URL
         value: clickhouse://default:langfuse_secure_password@clickhouse-euvv:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
