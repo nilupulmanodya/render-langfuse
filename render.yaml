@@ -6,11 +6,11 @@ services:
     name: minio
     runtime: image
     image: 
-      url: minio/minio:latest # Switched to official image for better compatibility
+      url: minio/minio:latest
     region: oregon
     plan: starter
-    # FIX: Run MinIO directly. You must manually create the 'langfuse' bucket in the UI later.
-    startCommand: "minio server /data --console-address \":9001\""
+    # FIX: Removed "minio" prefix and quotes. The image entrypoint handles the binary.
+    startCommand: server /data --console-address :9001
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
@@ -34,7 +34,6 @@ services:
     envVars:
       - key: CLICKHOUSE_DB
         value: default
-      # FIX: Use 'default' user to prevent the init script from crashing
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
@@ -66,7 +65,6 @@ services:
           property: connectionString
       - key: CLICKHOUSE_HOST
         value: http://clickhouse:8123
-      # FIX: Updated to match the 'default' user we set above
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
@@ -121,7 +119,6 @@ services:
           property: connectionString
       - key: CLICKHOUSE_HOST
         value: http://clickhouse:8123
-      # FIX: Updated to match the 'default' user
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
