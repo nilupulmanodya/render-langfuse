@@ -4,9 +4,12 @@ services:
   # -------------------------------------------------------
   - type: pserv
     name: minio
-    image: cgr.dev/chainguard/minio:latest
+    runtime: image # Explicitly state this is a prebuilt image
+    image: 
+      url: cgr.dev/chainguard/minio:latest-dev # Use 'dev' tag to get /bin/sh
     region: oregon
     plan: starter
+    # This command requires the 'dev' image variant to work
     startCommand: "sh -c 'mkdir -p /data/langfuse && minio server --address \":9000\" --console-address \":9001\" /data'"
     envVars:
       - key: MINIO_ROOT_USER
@@ -23,7 +26,9 @@ services:
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
-    image: clickhouse/clickhouse-server:latest
+    runtime: image
+    image:
+      url: clickhouse/clickhouse-server:latest
     region: oregon
     plan: standard
     envVars:
@@ -39,20 +44,13 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 3. Redis - Managed Service
-  # (MOVED HERE inside 'services')
-  # -------------------------------------------------------
-  - type: redis
-    name: langfuse-redis
-    region: oregon
-    plan: starter
-
-  # -------------------------------------------------------
-  # 4. Langfuse Worker
+  # 3. Langfuse Worker
   # -------------------------------------------------------
   - type: worker
     name: langfuse-worker
-    image: langfuse/langfuse-worker:3
+    runtime: image
+    image:
+      url: langfuse/langfuse-worker:3
     region: oregon
     envVars:
       - key: DATABASE_URL
@@ -69,7 +67,7 @@ services:
           type: redis
           name: langfuse-redis
           property: port
-      - key: REDIS_AUTH # Render handles Redis auth automatically
+      - key: REDIS_AUTH
         fromService:
           type: redis
           name: langfuse-redis
@@ -104,11 +102,13 @@ services:
         generateValue: true
 
   # -------------------------------------------------------
-  # 5. Langfuse Web (UI)
+  # 4. Langfuse Web (UI)
   # -------------------------------------------------------
   - type: web
     name: langfuse-web
-    image: langfuse/langfuse:3
+    runtime: image
+    image:
+      url: langfuse/langfuse:3
     region: oregon
     plan: starter
     healthCheckPath: /api/public/health
@@ -166,8 +166,16 @@ services:
       - key: ENCRYPTION_KEY
         generateValue: true
 
+  # -------------------------------------------------------
+  # 5. Redis (Managed Service)
+  # -------------------------------------------------------
+  - type: redis
+    name: langfuse-redis
+    region: oregon
+    plan: starter
+
 # -------------------------------------------------------
-# Databases (Postgres is separate from Services)
+# Databases
 # -------------------------------------------------------
 databases:
   - name: langfuse-postgres
