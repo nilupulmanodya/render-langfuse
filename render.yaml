@@ -1,6 +1,6 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (AWS ECR Mirror - Stable)
+  # 1. MinIO (AWS ECR Mirror)
   # -------------------------------------------------------
   - type: pserv
     name: minio
@@ -29,13 +29,12 @@ services:
     image:
       url: clickhouse/clickhouse-server:latest
     region: oregon
-    plan: standard # Must be Standard (2GB) to avoid crash
+    plan: standard
     envVars:
       - key: CLICKHOUSE_DB
         value: default
       - key: CLICKHOUSE_USER
         value: default
-      # FIX: Hardcoded password so we can build the Migration URL below
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
     disk:
@@ -63,15 +62,18 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
+      # FIX: Updated to match your actual internal hostname (clickhouse-euvv)
       - key: CLICKHOUSE_URL
-        value: http://clickhouse:8123
+        value: http://clickhouse-euvv:8123
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      # FIX: Added required Migration URL with the fixed password
+      # FIX: Updated hostname here as well
       - key: CLICKHOUSE_MIGRATION_URL
-        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
+        value: clickhouse://default:langfuse_secure_password@clickhouse-euvv:9000
+      - key: CLICKHOUSE_CLUSTER_ENABLED
+        value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
@@ -117,15 +119,18 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
+      # FIX: Updated to match your actual internal hostname
       - key: CLICKHOUSE_URL
-        value: http://clickhouse:8123
+        value: http://clickhouse-euvv:8123
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      # FIX: Added required Migration URL for Web service too
+      # FIX: Updated hostname here as well
       - key: CLICKHOUSE_MIGRATION_URL
-        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
+        value: clickhouse://default:langfuse_secure_password@clickhouse-euvv:9000
+      - key: CLICKHOUSE_CLUSTER_ENABLED
+        value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
