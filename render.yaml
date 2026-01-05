@@ -1,6 +1,6 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (AWS ECR Mirror - Stable & Fast)
+  # 1. MinIO (AWS ECR Mirror - Stable)
   # -------------------------------------------------------
   - type: pserv
     name: minio
@@ -21,7 +21,7 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Standard Plan - Required for 2GB RAM)
+  # 2. ClickHouse (Standard Plan + Fixed Password)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
@@ -29,15 +29,15 @@ services:
     image:
       url: clickhouse/clickhouse-server:latest
     region: oregon
-    # CRITICAL: 'standard' plan prevents the "Ran out of memory" crash
-    plan: standard 
+    plan: standard # Must be Standard (2GB) to avoid crash
     envVars:
       - key: CLICKHOUSE_DB
         value: default
       - key: CLICKHOUSE_USER
         value: default
+      # FIX: Hardcoded password so we can build the Migration URL below
       - key: CLICKHOUSE_PASSWORD
-        generateValue: true
+        value: langfuse_secure_password
     disk:
       name: clickhouse-data
       mountPath: /var/lib/clickhouse
@@ -68,10 +68,10 @@ services:
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
-        fromService:
-          type: pserv
-          name: clickhouse
-          envVarKey: CLICKHOUSE_PASSWORD
+        value: langfuse_secure_password
+      # FIX: Added required Migration URL with the fixed password
+      - key: CLICKHOUSE_MIGRATION_URL
+        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
@@ -89,7 +89,6 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
-      # FIX: Hardcoded valid 64-char hex key to satisfy Zod validation
       - key: ENCRYPTION_KEY
         value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
 
@@ -123,10 +122,10 @@ services:
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
-        fromService:
-          type: pserv
-          name: clickhouse
-          envVarKey: CLICKHOUSE_PASSWORD
+        value: langfuse_secure_password
+      # FIX: Added required Migration URL for Web service too
+      - key: CLICKHOUSE_MIGRATION_URL
+        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
@@ -144,7 +143,6 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
-      # FIX: Same key as worker
       - key: ENCRYPTION_KEY
         value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
 
