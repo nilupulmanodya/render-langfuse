@@ -56,7 +56,6 @@ services:
         fromDatabase:
           name: langfuse-postgres
           property: connectionString
-      # FIX: Use full connection string instead of split auth
       - key: REDIS_CONNECTION_STRING
         fromService:
           type: redis
@@ -111,7 +110,6 @@ services:
         fromDatabase:
           name: langfuse-postgres
           property: connectionString
-      # FIX: Use full connection string for Web too
       - key: REDIS_CONNECTION_STRING
         fromService:
           type: redis
@@ -153,8 +151,6 @@ services:
     name: langfuse-redis
     region: oregon
     plan: starter
-    # FIX: Must specify an allow list. Empty list [] denies external IPs 
-    # but still allows internal Render services (like Web/Worker) to connect.
     ipAllowList: [] 
 
 # -------------------------------------------------------
@@ -163,6 +159,6 @@ services:
 databases:
   - name: langfuse-postgres
     region: oregon
-    plan: standard
+    plan: basic # CHANGED: "standard" is legacy. "basic" is the modern equivalent.
     databaseName: langfuse
     user: langfuse
