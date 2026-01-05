@@ -1,16 +1,16 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (Bitnami Image - Fixes the crash)
+  # 1. MinIO (Bitnami via AWS ECR)
+  #    Using AWS ECR mirror to bypass Docker Hub rate-limits on Render.
   # -------------------------------------------------------
   - type: pserv
     name: minio
     runtime: image
-    # FIX: Use Bitnami image. It handles Render's shell wrapping correctly.
     image: 
-      url: bitnami/minio:latest
+      url: public.ecr.aws/bitnami/minio:latest
     region: oregon
     plan: starter
-    # Bitnami expects the standard server command
+    # Bitnami images handle Render's shell commands correctly (no crash loop)
     startCommand: minio server /data --console-address :9001
     envVars:
       - key: MINIO_ROOT_USER
@@ -23,7 +23,8 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Default User - Fixes permissions)
+  # 2. ClickHouse (Default User)
+  #    Using 'default' user prevents the permission crash loop.
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
@@ -35,7 +36,6 @@ services:
     envVars:
       - key: CLICKHOUSE_DB
         value: default
-      # FIX: Use 'default' user to bypass init script crashes
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
@@ -149,7 +149,7 @@ services:
         generateValue: true
 
   # -------------------------------------------------------
-  # 5. Redis (Managed Service)
+  # 5. Redis (Managed)
   # -------------------------------------------------------
   - type: redis
     name: langfuse-redis
