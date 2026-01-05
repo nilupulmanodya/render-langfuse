@@ -1,16 +1,17 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (S3 Replacement) - Private Service
+  # 1. MinIO (Bitnami Image - Fixes the crash)
   # -------------------------------------------------------
   - type: pserv
     name: minio
     runtime: image
+    # FIX: Use Bitnami image. It handles Render's shell wrapping correctly.
     image: 
-      url: minio/minio:latest
+      url: bitnami/minio:latest
     region: oregon
     plan: starter
-    # FIX: Use /bin/sh to ensure arguments are parsed correctly
-    startCommand: /bin/sh -c "minio server /data --console-address :9001"
+    # Bitnami expects the standard server command
+    startCommand: minio server /data --console-address :9001
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
@@ -22,7 +23,7 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse - Private Service
+  # 2. ClickHouse (Default User - Fixes permissions)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
@@ -34,6 +35,7 @@ services:
     envVars:
       - key: CLICKHOUSE_DB
         value: default
+      # FIX: Use 'default' user to bypass init script crashes
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
