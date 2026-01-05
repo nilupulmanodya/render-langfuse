@@ -1,7 +1,6 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (Bitnami via AWS ECR)
-  #    Using AWS ECR mirror to bypass Docker Hub rate-limits on Render.
+  # 1. MinIO (AWS ECR Mirror - Stable & Fast)
   # -------------------------------------------------------
   - type: pserv
     name: minio
@@ -10,7 +9,6 @@ services:
       url: public.ecr.aws/bitnami/minio:latest
     region: oregon
     plan: starter
-    # Bitnami images handle Render's shell commands correctly (no crash loop)
     startCommand: minio server /data --console-address :9001
     envVars:
       - key: MINIO_ROOT_USER
@@ -23,8 +21,7 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Default User)
-  #    Using 'default' user prevents the permission crash loop.
+  # 2. ClickHouse (Standard Plan - Required for 2GB RAM)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
@@ -32,7 +29,8 @@ services:
     image:
       url: clickhouse/clickhouse-server:latest
     region: oregon
-    plan: standard
+    # CRITICAL: 'standard' plan prevents the "Ran out of memory" crash
+    plan: standard 
     envVars:
       - key: CLICKHOUSE_DB
         value: default
@@ -65,7 +63,7 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      - key: CLICKHOUSE_HOST
+      - key: CLICKHOUSE_URL
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
         value: default
@@ -91,8 +89,9 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
+      # FIX: Hardcoded valid 64-char hex key to satisfy Zod validation
       - key: ENCRYPTION_KEY
-        generateValue: true
+        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
 
   # -------------------------------------------------------
   # 4. Langfuse Web (UI)
@@ -119,7 +118,7 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      - key: CLICKHOUSE_HOST
+      - key: CLICKHOUSE_URL
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
         value: default
@@ -145,11 +144,12 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
+      # FIX: Same key as worker
       - key: ENCRYPTION_KEY
-        generateValue: true
+        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
 
   # -------------------------------------------------------
-  # 5. Redis (Managed)
+  # 5. Redis
   # -------------------------------------------------------
   - type: redis
     name: langfuse-redis
