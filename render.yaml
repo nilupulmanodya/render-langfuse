@@ -5,7 +5,7 @@ services:
   - type: pserv
     name: minio
     runtime: image
-    image: 
+    image:
       url: public.ecr.aws/bitnami/minio:2025.10.15
     region: oregon
     plan: starter
@@ -31,8 +31,6 @@ services:
     region: oregon
     plan: standard
     envVars:
-      # NOTE: Only Password here. 
-      # Removing 'CLICKHOUSE_USER' prevents the "Operation not permitted" crash.
       - key: CLICKHOUSE_PASSWORD
         generateValue: true
     disk:
@@ -49,76 +47,61 @@ services:
     image:
       url: langfuse/langfuse-worker:3.122.0
     region: oregon
-    # CHANGED: Upgraded to Standard Plan
     plan: standard
-    # WAITS for dynamic hosts ($DB_HOST, $CH_HOST) before starting
     startCommand: >
       /bin/sh -c '
       echo "--- Checking Dependencies ---";
-      until node -e "require('net').createConnection(5432, process.env.DB_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
-      until node -e "require('net').createConnection(8123, process.env.CH_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      until nc -z $DB_HOST 5432; do sleep 2; done;
+      until nc -z clickhouse 8123; do sleep 2; done;
       echo "--- Dependencies UP ---";
       node dist/worker.js'
     envVars:
-      # --- Helpers for Dynamic Values ---
+      # --- Helpers ---
       - key: DB_HOST
-        fromDatabase: {name: langfuse-postgres, property: host}
-      - key: CH_HOST
-        fromService: {type: pserv, name: clickhouse, property: host}
-      - key: MINIO_HOST
-        fromService: {type: pserv, name: minio, property: host}
+        fromDatabase: { name: langfuse-postgres, property: host }
 
       # --- App Configuration ---
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
           property: connectionString
+
       - key: REDIS_CONNECTION_STRING
         fromService:
           type: redis
           name: langfuse-redis
           property: connectionString
-      
-      # ClickHouse Config (Dynamic)
+
+      # ClickHouse Config
       - key: CLICKHOUSE_USER
         value: default
-      - key: CLICKHOUSE_PASSWORD 
-        fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
-      
+      - key: CLICKHOUSE_PASSWORD
+        value: REPLACE_WITH_CLICKHOUSE_PASSWORD
       - key: CLICKHOUSE_URL
-        # DYNAMIC: Uses the helper $(CH_HOST)
-        value: http://$(CH_HOST):8123
-        
+        value: http://clickhouse:8123
       - key: CLICKHOUSE_MIGRATION_URL
-        # DYNAMIC: Uses $(CH_HOST) and $(CLICKHOUSE_PASSWORD)
-        value: clickhouse://default:$(CLICKHOUSE_PASSWORD)@$(CH_HOST):9000
-        
+        value: clickhouse://default:REPLACE_WITH_CLICKHOUSE_PASSWORD@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
 
-      # MinIO Config (Dynamic)
+      # MinIO Config
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
-        
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-        # DYNAMIC: Uses helper $(MINIO_HOST)
-        value: http://$(MINIO_HOST):9000
-        
+        value: http://minio:9000
       - key: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
         value: minio
       - key: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
-        fromService:
-          type: pserv
-          name: minio
-          envVarKey: MINIO_ROOT_PASSWORD
+        value: REPLACE_WITH_MINIO_ROOT_PASSWORD
       - key: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
         value: "true"
       - key: LANGFUSE_S3_EVENT_UPLOAD_REGION
         value: us-east-1
+
       - key: SALT
         generateValue: true
       - key: ENCRYPTION_KEY
-        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
+        value: e4bad55e8d530635489020968630737307041490216694600494002621062002
 
   # -------------------------------------------------------
   # 4. Langfuse Web (UI)
@@ -131,78 +114,63 @@ services:
     region: oregon
     plan: standard
     healthCheckPath: /api/public/health
-    # WAITS for dynamic hosts ($DB_HOST, $CH_HOST) before starting
     startCommand: >
       /bin/sh -c '
       echo "--- Checking Dependencies ---";
-      until node -e "require('net').createConnection(5432, process.env.DB_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
-      until node -e "require('net').createConnection(8123, process.env.CH_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      until nc -z $DB_HOST 5432; do sleep 2; done;
+      until nc -z clickhouse 8123; do sleep 2; done;
       echo "--- Dependencies UP ---";
       npm run start'
     envVars:
-      # --- Helpers for Dynamic Values ---
       - key: DB_HOST
-        fromDatabase: {name: langfuse-postgres, property: host}
-      - key: CH_HOST
-        fromService: {type: pserv, name: clickhouse, property: host}
-      - key: MINIO_HOST
-        fromService: {type: pserv, name: minio, property: host}
+        fromDatabase: { name: langfuse-postgres, property: host }
 
-      # --- App Configuration ---
       - key: NEXTAUTH_URL
-        value: https://langfuse-web.onrender.com 
+        value: https://langfuse-web.onrender.com
       - key: NEXTAUTH_SECRET
         generateValue: true
+
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
           property: connectionString
+
       - key: REDIS_CONNECTION_STRING
         fromService:
           type: redis
           name: langfuse-redis
           property: connectionString
 
-      # ClickHouse Config (Dynamic)
+      # ClickHouse Config
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
-        fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
-      
+        value: REPLACE_WITH_CLICKHOUSE_PASSWORD
       - key: CLICKHOUSE_URL
-        # DYNAMIC: Uses $(CH_HOST)
-        value: http://$(CH_HOST):8123
-        
+        value: http://clickhouse:8123
       - key: CLICKHOUSE_MIGRATION_URL
-        # DYNAMIC: Uses $(CH_HOST) and $(CLICKHOUSE_PASSWORD)
-        value: clickhouse://default:$(CLICKHOUSE_PASSWORD)@$(CH_HOST):9000
-        
+        value: clickhouse://default:REPLACE_WITH_CLICKHOUSE_PASSWORD@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
 
-      # MinIO Config (Dynamic)
+      # MinIO Config
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
-        
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-        # DYNAMIC: Uses $(MINIO_HOST)
-        value: http://$(MINIO_HOST):9000
-        
+        value: http://minio:9000
       - key: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
         value: minio
       - key: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
-        fromService:
-          type: pserv
-          name: minio
-          envVarKey: MINIO_ROOT_PASSWORD
+        value: REPLACE_WITH_MINIO_ROOT_PASSWORD
       - key: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
         value: "true"
       - key: LANGFUSE_S3_EVENT_UPLOAD_REGION
         value: us-east-1
+
       - key: SALT
         generateValue: true
       - key: ENCRYPTION_KEY
-        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
+        value: e4bad55e8d530635489020968630737307041490216694600494002621062002
 
   # -------------------------------------------------------
   # 5. Redis
@@ -211,7 +179,7 @@ services:
     name: langfuse-redis
     region: oregon
     plan: starter
-    ipAllowList: [] 
+    ipAllowList: []
 
 databases:
   - name: langfuse-postgres
