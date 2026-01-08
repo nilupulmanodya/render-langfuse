@@ -1,6 +1,6 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO
+  # 1. MinIO (S3 Storage) - Starts First
   # -------------------------------------------------------
   - type: pserv
     name: minio
@@ -9,19 +9,27 @@ services:
       url: public.ecr.aws/bitnami/minio:latest
     region: oregon
     plan: starter
-    startCommand: minio server /data --console-address :9001
+    # SAFETY CONFIG:
+    # 1. We force PORT to 9000 so it never randomizes to 10000.
+    # 2. We use MINIO_DEFAULT_BUCKETS to auto-create the 'langfuse' bucket.
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
+      - key: MINIO_DEFAULT_BUCKETS
+        value: "langfuse"
+      - key: MINIO_DATA_DIR
+        value: "/data"
+      - key: PORT  # <--- FORCE STABLE PORT
+        value: "9000"
     disk:
       name: minio-data
       mountPath: /data
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse
+  # 2. ClickHouse (Analytics DB)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
@@ -30,6 +38,9 @@ services:
       url: clickhouse/clickhouse-server:latest
     region: oregon
     plan: standard
+    # SAFETY CONFIG:
+    # ClickHouse uses 8123 (HTTP) and 9000 (TCP). 
+    # We force the primary PORT to 8123 so Render checks health there.
     envVars:
       - key: CLICKHOUSE_DB
         value: default
@@ -37,13 +48,15 @@ services:
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
+      - key: PORT # <--- FORCE STABLE PORT
+        value: "8123"
     disk:
       name: clickhouse-data
       mountPath: /var/lib/clickhouse
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 3. Langfuse Worker
+  # 3. Langfuse Worker (Background Jobs)
   # -------------------------------------------------------
   - type: worker
     name: langfuse-worker
@@ -62,15 +75,17 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # INTERNAL HOSTNAME PRESERVED: clickhouse-euvv
+      # STABLE HOSTNAMES:
+      # Because we named the services 'clickhouse' and 'minio' above,
+      # and forced the ports, these URLs are now guaranteed to work.
       - key: CLICKHOUSE_URL
-        value: http://clickhouse-euvv:8123
+        value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
       - key: CLICKHOUSE_MIGRATION_URL
-        value: clickhouse://default:langfuse_secure_password@clickhouse-euvv:9000
+        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
@@ -91,7 +106,7 @@ services:
       - key: SALT
         generateValue: true
       - key: ENCRYPTION_KEY
-        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
+        generateValue: true
 
   # -------------------------------------------------------
   # 4. Langfuse Web (UI)
@@ -102,7 +117,6 @@ services:
     image:
       url: langfuse/langfuse:3
     region: oregon
-    # FIX: Upgraded to 'standard' (2GB RAM) to fix Heap Out of Memory crash
     plan: standard 
     healthCheckPath: /api/public/health
     envVars:
@@ -119,15 +133,14 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # INTERNAL HOSTNAME PRESERVED: clickhouse-euvv
       - key: CLICKHOUSE_URL
-        value: http://clickhouse-euvv:8123
+        value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
       - key: CLICKHOUSE_MIGRATION_URL
-        value: clickhouse://default:langfuse_secure_password@clickhouse-euvv:9000
+        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
@@ -148,10 +161,44 @@ services:
       - key: SALT
         generateValue: true
       - key: ENCRYPTION_KEY
-        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
+        generateValue: true
 
   # -------------------------------------------------------
-  # 5. Redis
+  # 5. LiteLLM Proxy (OTEL Integration)
+  # -------------------------------------------------------
+  - type: web
+    name: synthifai-proxy
+    runtime: image
+    image:
+      url: ghcr.io/berriai/litellm:main-stable
+    numInstances: 1
+    healthCheckPath: /health/liveliness
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 4000
+      
+      # ENABLE OTEL TRACING (JSON FORMAT REQUIRED)
+      - key: LITELLM_CALLBACKS
+        value: '["langfuse_otel"]'
+
+      # --- SECRETS (You MUST add these in Dashboard later) ---
+      
+      # URL Example: https://langfuse-web-xxxx.onrender.com/api/public/otel
+      - key: LANGFUSE_OTEL_HOST
+        sync: false
+
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+        
+      # Master Key for Security
+      - key: LITELLM_MASTER_KEY
+        sync: false
+
+  # -------------------------------------------------------
+  # 6. Redis
   # -------------------------------------------------------
   - type: redis
     name: langfuse-redis
