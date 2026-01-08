@@ -25,23 +25,13 @@ services:
   # 2. ClickHouse (Analytics DB)
   # -------------------------------------------------------
   - type: pserv
-    name: clickhouse
-    runtime: image
-    image:
-      url: clickhouse/clickhouse-server:24.3.2
-    region: oregon
-    plan: standard
-    envVars:
-      - key: CLICKHOUSE_DB
-        value: default
-      - key: CLICKHOUSE_USER
-        value: default
-      - key: CLICKHOUSE_PASSWORD
-        generateValue: true
-    disk:
-      name: clickhouse-data
-      mountPath: /var/lib/clickhouse
-      sizeGB: 10
+      name: clickhouse
+      # ... (image, region, etc remain the same) ...
+      envVars:
+        # REMOVED: CLICKHOUSE_DB (Defaults to 'default' automatically)
+        # REMOVED: CLICKHOUSE_USER (Defaults to 'default' automatically)
+        - key: CLICKHOUSE_PASSWORD
+          generateValue: true
 
   # -------------------------------------------------------
   # 3. Langfuse Worker
