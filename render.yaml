@@ -1,50 +1,44 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (Official Image - Fixed Command)
+  # 1. MinIO (S3 Storage)
   # -------------------------------------------------------
   - type: pserv
     name: minio
     runtime: image
     image: 
-      # PINNED: Stable 2024 Release
-      url: minio/minio:RELEASE.2024-11-07T00-52-20Z
+      # Pinned to a specific Bitnami release date tag
+      url: public.ecr.aws/bitnami/minio:2024.1.17
     region: oregon
     plan: starter
-    # FIX: Removed "minio" from the start.
-    # The image automatically adds 'minio', so we just provide the arguments.
-    startCommand: "server /data --console-address :9001"
+    startCommand: minio server /data --console-address :9001
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
-      - key: PORT
-        value: "9000"
     disk:
       name: minio-data
       mountPath: /data
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Working)
+  # 2. ClickHouse (Analytics DB)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
     runtime: image
     image:
-      url: clickhouse/clickhouse-server:24.3
+      # Pinned to 24.3 LTS (Long Term Support)
+      url: clickhouse/clickhouse-server:24.3.2
     region: oregon
     plan: standard
-    startCommand: "/usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml"
     envVars:
       - key: CLICKHOUSE_DB
         value: default
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
-        value: langfuse_secure_password
-      - key: PORT
-        value: "8123"
+        generateValue: true
     disk:
       name: clickhouse-data
       mountPath: /var/lib/clickhouse
@@ -57,10 +51,34 @@ services:
     name: langfuse-worker
     runtime: image
     image:
-      url: langfuse/langfuse-worker:3
+      # Pinned to specific patch version
+      url: langfuse/langfuse-worker:3.145.0
     region: oregon
     plan: starter
+    startCommand: >
+      /bin/sh -c '
+      echo "--- Checking Dependencies ---";
+      echo "Waiting for Postgres at $DB_HOST...";
+      until node -e "require('net').createConnection(5432, process.env.DB_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      echo "Waiting for Clickhouse at $CH_HOST...";
+      until node -e "require('net').createConnection(8123, process.env.CH_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      echo "--- Dependencies UP ---";
+      
+      export CLICKHOUSE_URL="http://${CH_HOST}:8123"
+      export CLICKHOUSE_MIGRATION_URL="clickhouse://default:${CH_PASS}@${CH_HOST}:9000"
+      export LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT="http://${MINIO_HOST}:9000"
+      
+      node dist/worker.js'
     envVars:
+      - key: DB_HOST
+        fromDatabase: {name: langfuse-postgres, property: host}
+      - key: CH_HOST
+        fromService: {name: clickhouse, property: host}
+      - key: CH_PASS
+        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+      - key: MINIO_HOST
+        fromService: {name: minio, property: host}
+      
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
@@ -70,20 +88,14 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      - key: CLICKHOUSE_URL
-        value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
         value: default
-      - key: CLICKHOUSE_PASSWORD
-        value: langfuse_secure_password
-      - key: CLICKHOUSE_MIGRATION_URL
-        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
+      - key: CLICKHOUSE_PASSWORD 
+        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
-      - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-        value: http://minio:9000
       - key: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
         value: minio
       - key: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
@@ -98,22 +110,46 @@ services:
       - key: SALT
         generateValue: true
       - key: ENCRYPTION_KEY
-        value: "a6d2c49641776993510255345700249286701550917639103957242137525310"
+        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
 
   # -------------------------------------------------------
-  # 4. Langfuse Web
+  # 4. Langfuse Web (UI)
   # -------------------------------------------------------
   - type: web
     name: langfuse-web
     runtime: image
     image:
-      url: langfuse/langfuse:3
+      # Pinned to specific patch version
+      url: langfuse/langfuse:3.145.0
     region: oregon
-    plan: standard 
+    plan: standard
     healthCheckPath: /api/public/health
+    startCommand: >
+      /bin/sh -c '
+      echo "--- Checking Dependencies ---";
+      echo "Waiting for Postgres at $DB_HOST...";
+      until node -e "require('net').createConnection(5432, process.env.DB_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      echo "Waiting for Clickhouse at $CH_HOST...";
+      until node -e "require('net').createConnection(8123, process.env.CH_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      echo "--- Dependencies UP ---";
+      
+      export CLICKHOUSE_URL="http://${CH_HOST}:8123"
+      export CLICKHOUSE_MIGRATION_URL="clickhouse://default:${CH_PASS}@${CH_HOST}:9000"
+      export LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT="http://${MINIO_HOST}:9000"
+      
+      npm run start'
     envVars:
+      - key: DB_HOST
+        fromDatabase: {name: langfuse-postgres, property: host}
+      - key: CH_HOST
+        fromService: {name: clickhouse, property: host}
+      - key: CH_PASS
+        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+      - key: MINIO_HOST
+        fromService: {name: minio, property: host}
+
       - key: NEXTAUTH_URL
-        value: https://langfuse-web.onrender.com
+        value: https://langfuse-web.onrender.com 
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: DATABASE_URL
@@ -125,20 +161,14 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      - key: CLICKHOUSE_URL
-        value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
         value: default
       - key: CLICKHOUSE_PASSWORD
-        value: langfuse_secure_password
-      - key: CLICKHOUSE_MIGRATION_URL
-        value: clickhouse://default:langfuse_secure_password@clickhouse:9000
+        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
-      - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-        value: http://minio:9000
       - key: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
         value: minio
       - key: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
@@ -153,35 +183,10 @@ services:
       - key: SALT
         generateValue: true
       - key: ENCRYPTION_KEY
-        value: "a6d2c49641776993510255345700249286701550917639103957242137525310"
+        value: "e4bad55e8d530635489020968630737307041490216694600494002621062002"
 
   # -------------------------------------------------------
-  # 5. LiteLLM Proxy
-  # -------------------------------------------------------
-  - type: web
-    name: synthifai-proxy
-    runtime: image
-    image:
-      url: ghcr.io/berriai/litellm:main-v1.80.12-nightly
-    envVars:
-      - key: PORT
-        value: 4000
-      - key: LITELLM_CALLBACKS
-        value: '["langfuse_otel"]'
-      - key: LANGFUSE_OTEL_HOST
-        sync: false
-      - key: LANGFUSE_PUBLIC_KEY
-        sync: false
-      - key: LANGFUSE_SECRET_KEY
-        sync: false
-      - key: LITELLM_MASTER_KEY
-        sync: false
-    numInstances: 1
-    healthCheckPath: /health/liveliness
-    autoDeploy: true
-
-  # -------------------------------------------------------
-  # 6. Redis
+  # 5. Redis
   # -------------------------------------------------------
   - type: redis
     name: langfuse-redis
