@@ -9,7 +9,7 @@ services:
       url: public.ecr.aws/bitnami/minio:latest
     region: oregon
     plan: starter
-    # IMPROVEMENT: Removed manual startCommand so auto-setup works
+    # BITNAMI AUTO-CONFIG
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
@@ -36,7 +36,7 @@ services:
       url: clickhouse/clickhouse-server:latest
     region: oregon
     plan: standard
-    # SAFETY FIX: Bypass the entrypoint script to prevent "Operation not permitted" crash
+    # SAFETY FIX: Bypass the entrypoint script to prevent crash
     startCommand: "/usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml"
     envVars:
       - key: CLICKHOUSE_DB
@@ -72,7 +72,7 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # STABLE URLS (Thanks to forced ports above)
+      # STABLE URLS
       - key: CLICKHOUSE_URL
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
@@ -83,6 +83,7 @@ services:
         value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
+      # S3 / MINIO CONFIG
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
@@ -100,8 +101,9 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
+      # FIXED ENCRYPTION KEY (64-char Hex)
       - key: ENCRYPTION_KEY
-        generateValue: true
+        value: "a6d2c49641776993510255345700249286701550917639103957242137525310"
 
   # -------------------------------------------------------
   # 4. Langfuse Web (UI)
@@ -138,6 +140,7 @@ services:
         value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
+      # S3 / MINIO CONFIG
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
@@ -155,8 +158,9 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
+      # FIXED ENCRYPTION KEY (64-char Hex)
       - key: ENCRYPTION_KEY
-        generateValue: true
+        value: "a6d2c49641776993510255345700249286701550917639103957242137525310"
 
   # -------------------------------------------------------
   # 5. LiteLLM Proxy (OTEL Integration)
@@ -172,11 +176,12 @@ services:
     envVars:
       - key: PORT
         value: 4000
-      # ENABLE OTEL TRACING (JSON FORMAT REQUIRED)
+      
+      # ENABLE OTEL TRACING (Fixed JSON Format)
       - key: LITELLM_CALLBACKS
         value: '["langfuse_otel"]'
-        
-      # --- SECRETS TO ADD IN DASHBOARD ---
+
+      # --- SECRETS TO ADD MANUALLY IN DASHBOARD ---
       - key: LANGFUSE_OTEL_HOST
         sync: false
       - key: LANGFUSE_PUBLIC_KEY
