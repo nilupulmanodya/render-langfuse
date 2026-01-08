@@ -6,7 +6,6 @@ services:
     name: minio
     runtime: image
     image: 
-      # Pinned to a specific Bitnami release date tag
       url: public.ecr.aws/bitnami/minio:2024.1.17
     region: oregon
     plan: starter
@@ -28,7 +27,6 @@ services:
     name: clickhouse
     runtime: image
     image:
-      # Pinned to 24.3 LTS (Long Term Support)
       url: clickhouse/clickhouse-server:24.3.2
     region: oregon
     plan: standard
@@ -51,7 +49,6 @@ services:
     name: langfuse-worker
     runtime: image
     image:
-      # Pinned to specific patch version
       url: langfuse/langfuse-worker:3.145.0
     region: oregon
     plan: starter
@@ -72,12 +69,18 @@ services:
     envVars:
       - key: DB_HOST
         fromDatabase: {name: langfuse-postgres, property: host}
+      
+      # FIX: Added 'type: pserv'
       - key: CH_HOST
-        fromService: {name: clickhouse, property: host}
+        fromService: {type: pserv, name: clickhouse, property: host}
+      
+      # FIX: Added 'type: pserv'
       - key: CH_PASS
-        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+        fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+      
+      # FIX: Added 'type: pserv'
       - key: MINIO_HOST
-        fromService: {name: minio, property: host}
+        fromService: {type: pserv, name: minio, property: host}
       
       - key: DATABASE_URL
         fromDatabase:
@@ -90,8 +93,11 @@ services:
           property: connectionString
       - key: CLICKHOUSE_USER
         value: default
+      
+      # FIX: Added 'type: pserv'
       - key: CLICKHOUSE_PASSWORD 
-        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+        fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+        
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
@@ -119,7 +125,6 @@ services:
     name: langfuse-web
     runtime: image
     image:
-      # Pinned to specific patch version
       url: langfuse/langfuse:3.145.0
     region: oregon
     plan: standard
@@ -141,12 +146,18 @@ services:
     envVars:
       - key: DB_HOST
         fromDatabase: {name: langfuse-postgres, property: host}
+        
+      # FIX: Added 'type: pserv'
       - key: CH_HOST
-        fromService: {name: clickhouse, property: host}
+        fromService: {type: pserv, name: clickhouse, property: host}
+        
+      # FIX: Added 'type: pserv'
       - key: CH_PASS
-        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+        fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+        
+      # FIX: Added 'type: pserv'
       - key: MINIO_HOST
-        fromService: {name: minio, property: host}
+        fromService: {type: pserv, name: minio, property: host}
 
       - key: NEXTAUTH_URL
         value: https://langfuse-web.onrender.com 
@@ -163,8 +174,11 @@ services:
           property: connectionString
       - key: CLICKHOUSE_USER
         value: default
+        
+      # FIX: Added 'type: pserv'
       - key: CLICKHOUSE_PASSWORD
-        fromService: {name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+        fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
+        
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
