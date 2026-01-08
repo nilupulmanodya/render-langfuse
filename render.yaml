@@ -6,19 +6,18 @@ services:
     name: minio
     runtime: image
     image: 
-      url: public.ecr.aws/bitnami/minio:latest
+      # PINNED VERSION: November 2024 Release (Stable)
+      url: minio/minio:RELEASE.2024-11-07T00-52-20Z
     region: oregon
     plan: starter
+    # COMMAND: Manually create bucket & start server
+    startCommand: sh -c 'mkdir -p /data/langfuse && minio server /data --console-address :9001'
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
-      - key: MINIO_DEFAULT_BUCKETS
-        value: "langfuse"
-      - key: MINIO_DATA_DIR
-        value: "/data"
-      - key: PORT
+      - key: PORT         # Force Port 9000
         value: "9000"
     disk:
       name: minio-data
@@ -26,32 +25,30 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Bitnami Image - Production Stable)
+  # 2. ClickHouse (Analytics DB)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
     runtime: image
     image:
-      # SWITCHED TO BITNAMI: The only way to fix the Entrypoint crash on Render
-      url: bitnami/clickhouse:latest
+      # PINNED VERSION: 24.3 LTS (Long Term Support) - Very Stable
+      url: clickhouse/clickhouse-server:24.3
     region: oregon
     plan: standard
+    # COMMAND: Bypass broken entrypoint script to prevent crash
+    startCommand: "/usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml"
     envVars:
-      - key: ALLOW_EMPTY_PASSWORD
-        value: "yes"
       - key: CLICKHOUSE_DB
         value: default
       - key: CLICKHOUSE_USER
         value: default
-      # Bitnami uses this specific key for the password:
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      - key: PORT
+      - key: PORT         # Force Port 8123
         value: "8123"
     disk:
       name: clickhouse-data
-      # NOTE: Bitnami uses a different path than Official
-      mountPath: /bitnami/clickhouse
+      mountPath: /var/lib/clickhouse
       sizeGB: 10
 
   # -------------------------------------------------------
@@ -61,6 +58,7 @@ services:
     name: langfuse-worker
     runtime: image
     image:
+      # PINNED VERSION: Major version 3 (matches Web)
       url: langfuse/langfuse-worker:3
     region: oregon
     plan: starter
@@ -74,11 +72,7 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # ---------------------------------------------------------
-      # FIXED URLs: Using the service name "clickhouse" directly.
-      # If your logs still say "-a4fp", you must delete the env var
-      # in the Dashboard manually!
-      # ---------------------------------------------------------
+      # STABLE URLS
       - key: CLICKHOUSE_URL
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
@@ -116,6 +110,7 @@ services:
     name: langfuse-web
     runtime: image
     image:
+      # PINNED VERSION: Major version 3
       url: langfuse/langfuse:3
     region: oregon
     plan: standard 
@@ -171,7 +166,9 @@ services:
     name: synthifai-proxy
     runtime: image
     image:
-      url: ghcr.io/berriai/litellm:main-stable
+      # PINNED VERSION: v1.59.8 (Recent Stable)
+      # You can revert to 'main-stable' if you want auto-updates.
+      url: ghcr.io/berriai/litellm:v1.59.8
     envVars:
       - key: PORT
         value: 4000
