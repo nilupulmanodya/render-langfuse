@@ -6,7 +6,7 @@ services:
     name: minio
     runtime: image
     image: 
-      url: public.ecr.aws/bitnami/minio:latest
+      url: public.ecr.aws/bitnami/minio:2025.10.15
     region: oregon
     plan: starter
     startCommand: minio server /data --console-address :9001
@@ -27,14 +27,10 @@ services:
     name: clickhouse
     runtime: image
     image:
-      url: clickhouse/clickhouse-server:latest
+      url: clickhouse/clickhouse-server:24.3.2
     region: oregon
     plan: standard
     envVars:
-      - key: CLICKHOUSE_DB
-        value: default
-      - key: CLICKHOUSE_USER
-        value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
     disk:
@@ -49,9 +45,9 @@ services:
     name: langfuse-worker
     runtime: image
     image:
-      url: langfuse/langfuse-worker:3
+      url: langfuse/langfuse-worker:3.122.0
     region: oregon
-    plan: starter
+    plan: standard
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -100,7 +96,7 @@ services:
     name: langfuse-web
     runtime: image
     image:
-      url: langfuse/langfuse:3
+      url: langfuse/langfuse:3.122.0
     region: oregon
     # FIX: Upgraded to 'standard' (2GB RAM) to fix Heap Out of Memory crash
     plan: standard 
