@@ -27,7 +27,7 @@ services:
     name: clickhouse
     runtime: image
     image:
-      url: clickhouse/clickhouse-server:24.3.2
+      url: clickhouse/clickhouse-server:25.5.2
     region: oregon
     plan: standard
     envVars:
