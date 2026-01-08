@@ -49,7 +49,8 @@ services:
     image:
       url: langfuse/langfuse-worker:3.122.0
     region: oregon
-    plan: starter
+    # CHANGED: Upgraded to Standard Plan
+    plan: standard
     # WAITS for dynamic hosts ($DB_HOST, $CH_HOST) before starting
     startCommand: >
       /bin/sh -c '
@@ -59,7 +60,7 @@ services:
       echo "--- Dependencies UP ---";
       node dist/worker.js'
     envVars:
-      # --- Helpers for Dynamic Values (App ignores these, but uses them in values below) ---
+      # --- Helpers for Dynamic Values ---
       - key: DB_HOST
         fromDatabase: {name: langfuse-postgres, property: host}
       - key: CH_HOST
@@ -85,7 +86,7 @@ services:
         fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
       
       - key: CLICKHOUSE_URL
-        # DYNAMIC: Uses the helper $(CH_HOST) defined above
+        # DYNAMIC: Uses the helper $(CH_HOST)
         value: http://$(CH_HOST):8123
         
       - key: CLICKHOUSE_MIGRATION_URL
