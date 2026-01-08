@@ -9,17 +9,16 @@ services:
       url: public.ecr.aws/bitnami/minio:latest
     region: oregon
     plan: starter
-    # BITNAMI AUTO-CONFIG
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
-      - key: MINIO_DEFAULT_BUCKETS  # Auto-creates 'langfuse' bucket
+      - key: MINIO_DEFAULT_BUCKETS
         value: "langfuse"
       - key: MINIO_DATA_DIR
         value: "/data"
-      - key: PORT                   # Forces port 9000 (Stable)
+      - key: PORT
         value: "9000"
     disk:
       name: minio-data
@@ -27,33 +26,36 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Analytics DB)
+  # 2. ClickHouse (Bitnami Image - Production Stable)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
     runtime: image
     image:
-      url: clickhouse/clickhouse-server:latest
+      # SWITCHED TO BITNAMI: The only way to fix the Entrypoint crash on Render
+      url: bitnami/clickhouse:latest
     region: oregon
     plan: standard
-    # SAFETY FIX: Bypass the entrypoint script to prevent crash
-    startCommand: "/usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml"
     envVars:
+      - key: ALLOW_EMPTY_PASSWORD
+        value: "yes"
       - key: CLICKHOUSE_DB
         value: default
       - key: CLICKHOUSE_USER
         value: default
+      # Bitnami uses this specific key for the password:
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      - key: PORT                   # Forces port 8123 (Stable)
+      - key: PORT
         value: "8123"
     disk:
       name: clickhouse-data
-      mountPath: /var/lib/clickhouse
+      # NOTE: Bitnami uses a different path than Official
+      mountPath: /bitnami/clickhouse
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 3. Langfuse Worker (Background Jobs)
+  # 3. Langfuse Worker
   # -------------------------------------------------------
   - type: worker
     name: langfuse-worker
@@ -72,7 +74,11 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # STABLE URLS
+      # ---------------------------------------------------------
+      # FIXED URLs: Using the service name "clickhouse" directly.
+      # If your logs still say "-a4fp", you must delete the env var
+      # in the Dashboard manually!
+      # ---------------------------------------------------------
       - key: CLICKHOUSE_URL
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
@@ -83,7 +89,6 @@ services:
         value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
-      # S3 / MINIO CONFIG
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
@@ -101,12 +106,11 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
-      # FIXED ENCRYPTION KEY (64-char Hex)
       - key: ENCRYPTION_KEY
         value: "a6d2c49641776993510255345700249286701550917639103957242137525310"
 
   # -------------------------------------------------------
-  # 4. Langfuse Web (UI)
+  # 4. Langfuse Web
   # -------------------------------------------------------
   - type: web
     name: langfuse-web
@@ -140,7 +144,6 @@ services:
         value: clickhouse://default:langfuse_secure_password@clickhouse:9000
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
-      # S3 / MINIO CONFIG
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
         value: langfuse
       - key: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
@@ -158,30 +161,22 @@ services:
         value: us-east-1
       - key: SALT
         generateValue: true
-      # FIXED ENCRYPTION KEY (64-char Hex)
       - key: ENCRYPTION_KEY
         value: "a6d2c49641776993510255345700249286701550917639103957242137525310"
 
   # -------------------------------------------------------
-  # 5. LiteLLM Proxy (OTEL Integration)
+  # 5. LiteLLM Proxy
   # -------------------------------------------------------
   - type: web
     name: synthifai-proxy
     runtime: image
     image:
       url: ghcr.io/berriai/litellm:main-stable
-    numInstances: 1
-    healthCheckPath: /health/liveliness
-    autoDeploy: true
     envVars:
       - key: PORT
         value: 4000
-      
-      # ENABLE OTEL TRACING (Fixed JSON Format)
       - key: LITELLM_CALLBACKS
         value: '["langfuse_otel"]'
-
-      # --- SECRETS TO ADD MANUALLY IN DASHBOARD ---
       - key: LANGFUSE_OTEL_HOST
         sync: false
       - key: LANGFUSE_PUBLIC_KEY
@@ -190,6 +185,9 @@ services:
         sync: false
       - key: LITELLM_MASTER_KEY
         sync: false
+    numInstances: 1
+    healthCheckPath: /health/liveliness
+    autoDeploy: true
 
   # -------------------------------------------------------
   # 6. Redis
@@ -200,9 +198,6 @@ services:
     plan: starter
     ipAllowList: [] 
 
-# -------------------------------------------------------
-# Databases
-# -------------------------------------------------------
 databases:
   - name: langfuse-postgres
     region: oregon
