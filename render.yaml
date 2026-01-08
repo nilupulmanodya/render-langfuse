@@ -1,6 +1,6 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (Official Image - Crash Fixed)
+  # 1. MinIO (Official Image - Fixed Command)
   # -------------------------------------------------------
   - type: pserv
     name: minio
@@ -10,14 +10,15 @@ services:
       url: minio/minio:RELEASE.2024-11-07T00-52-20Z
     region: oregon
     plan: starter
-    # FIX: Use the native command. Do NOT use 'sh -c mkdir...' here.
-    startCommand: "minio server /data --console-address :9001"
+    # FIX: Removed "minio" from the start.
+    # The image automatically adds 'minio', so we just provide the arguments.
+    startCommand: "server /data --console-address :9001"
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
-      - key: PORT         # Force Port 9000
+      - key: PORT
         value: "9000"
     disk:
       name: minio-data
@@ -25,17 +26,15 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Official Image - Crash Fixed)
+  # 2. ClickHouse (Working)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
     runtime: image
     image:
-      # PINNED: 24.3 LTS (Very Stable)
       url: clickhouse/clickhouse-server:24.3
     region: oregon
     plan: standard
-    # COMMAND: Bypass broken entrypoint to prevent "kill: operation not permitted"
     startCommand: "/usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml"
     envVars:
       - key: CLICKHOUSE_DB
@@ -44,7 +43,7 @@ services:
         value: default
       - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      - key: PORT         # Force Port 8123
+      - key: PORT
         value: "8123"
     disk:
       name: clickhouse-data
@@ -71,7 +70,6 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # STABLE URLS (Guaranteed by forced ports above)
       - key: CLICKHOUSE_URL
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
@@ -164,7 +162,6 @@ services:
     name: synthifai-proxy
     runtime: image
     image:
-      # PINNED: Specific Nightly Version as requested
       url: ghcr.io/berriai/litellm:main-v1.80.12-nightly
     envVars:
       - key: PORT
