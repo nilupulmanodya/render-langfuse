@@ -29,30 +29,33 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Analytics DB)
+  # 2. ClickHouse (Analytics DB) - FIXED
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
     runtime: image
     image:
-      url: clickhouse/clickhouse-server:latest
+      # Switched to Bitnami for better Render compatibility
+      url: bitnami/clickhouse:latest
     region: oregon
     plan: standard
-    # SAFETY CONFIG:
-    # ClickHouse uses 8123 (HTTP) and 9000 (TCP). 
-    # We force the primary PORT to 8123 so Render checks health there.
     envVars:
       - key: CLICKHOUSE_DB
         value: default
-      - key: CLICKHOUSE_USER
-        value: default
-      - key: CLICKHOUSE_PASSWORD
+      
+      # BITNAMI SPECIFIC:
+      # Use this to set the password for the 'default' user.
+      - key: CLICKHOUSE_ADMIN_PASSWORD
         value: langfuse_secure_password
-      - key: PORT # <--- FORCE STABLE PORT
+      
+      # Note: We REMOVED 'CLICKHOUSE_USER' because we are using 
+      # the built-in 'default' user, which Bitnami configures automatically.
+      
+      - key: PORT
         value: "8123"
     disk:
       name: clickhouse-data
-      mountPath: /var/lib/clickhouse
+      mountPath: /bitnami/clickhouse
       sizeGB: 10
 
   # -------------------------------------------------------
