@@ -6,7 +6,6 @@ services:
     name: minio
     runtime: image
     image: 
-      # Pinned to the specific tag you requested
       url: public.ecr.aws/bitnami/minio:2025.10.15
     region: oregon
     plan: starter
@@ -25,13 +24,21 @@ services:
   # 2. ClickHouse (Analytics DB)
   # -------------------------------------------------------
   - type: pserv
-      name: clickhouse
-      # ... (image, region, etc remain the same) ...
-      envVars:
-        # REMOVED: CLICKHOUSE_DB (Defaults to 'default' automatically)
-        # REMOVED: CLICKHOUSE_USER (Defaults to 'default' automatically)
-        - key: CLICKHOUSE_PASSWORD
-          generateValue: true
+    name: clickhouse
+    runtime: image
+    image:
+      url: clickhouse/clickhouse-server:24.3.2
+    region: oregon
+    plan: standard
+    envVars:
+      # FIX: Removed USER/DB vars to prevent "Operation not permitted" crash.
+      # The image defaults to user="default" automatically.
+      - key: CLICKHOUSE_PASSWORD
+        generateValue: true
+    disk:
+      name: clickhouse-data
+      mountPath: /var/lib/clickhouse
+      sizeGB: 10
 
   # -------------------------------------------------------
   # 3. Langfuse Worker
@@ -43,23 +50,27 @@ services:
       url: langfuse/langfuse-worker:3.122.0
     region: oregon
     plan: starter
-    # STARTUP SCRIPT: Waits for DB/Clickhouse/Minio connectivity
+    # STARTUP SCRIPT: Waits for DBs to be reachable
     startCommand: >
       /bin/sh -c '
       echo "--- Checking Dependencies ---";
+      
       echo "Waiting for Postgres at $DB_HOST...";
       until node -e "require('net').createConnection(5432, process.env.DB_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      
       echo "Waiting for Clickhouse at $CH_HOST...";
       until node -e "require('net').createConnection(8123, process.env.CH_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      
       echo "--- Dependencies UP ---";
       
+      # Construct URLs dynamically
       export CLICKHOUSE_URL="http://${CH_HOST}:8123"
       export CLICKHOUSE_MIGRATION_URL="clickhouse://default:${CH_PASS}@${CH_HOST}:9000"
       export LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT="http://${MINIO_HOST}:9000"
       
       node dist/worker.js'
     envVars:
-      # RAW VARS FOR START SCRIPT
+      # --- Raw Connection Vars (Used in startCommand) ---
       - key: DB_HOST
         fromDatabase: {name: langfuse-postgres, property: host}
       - key: CH_HOST
@@ -69,7 +80,7 @@ services:
       - key: MINIO_HOST
         fromService: {type: pserv, name: minio, property: host}
       
-      # LANGFUSE CONFIG
+      # --- Langfuse Config ---
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
@@ -114,23 +125,27 @@ services:
     region: oregon
     plan: standard
     healthCheckPath: /api/public/health
-    # STARTUP SCRIPT: Waits for DB/Clickhouse/Minio connectivity
+    # STARTUP SCRIPT: Waits for DBs to be reachable
     startCommand: >
       /bin/sh -c '
       echo "--- Checking Dependencies ---";
+      
       echo "Waiting for Postgres at $DB_HOST...";
       until node -e "require('net').createConnection(5432, process.env.DB_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      
       echo "Waiting for Clickhouse at $CH_HOST...";
       until node -e "require('net').createConnection(8123, process.env.CH_HOST).on('connect', ()=>process.exit(0)).on('error', ()=>process.exit(1))"; do sleep 2; done;
+      
       echo "--- Dependencies UP ---";
       
+      # Construct URLs dynamically
       export CLICKHOUSE_URL="http://${CH_HOST}:8123"
       export CLICKHOUSE_MIGRATION_URL="clickhouse://default:${CH_PASS}@${CH_HOST}:9000"
       export LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT="http://${MINIO_HOST}:9000"
       
       npm run start'
     envVars:
-      # RAW VARS FOR START SCRIPT
+      # --- Raw Connection Vars ---
       - key: DB_HOST
         fromDatabase: {name: langfuse-postgres, property: host}
       - key: CH_HOST
@@ -140,11 +155,13 @@ services:
       - key: MINIO_HOST
         fromService: {type: pserv, name: minio, property: host}
 
-      # LANGFUSE CONFIG
+      # --- Web Specific Config ---
       - key: NEXTAUTH_URL
         value: https://langfuse-web.onrender.com 
       - key: NEXTAUTH_SECRET
         generateValue: true
+      
+      # --- Shared Config ---
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
