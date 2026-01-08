@@ -6,7 +6,8 @@ services:
     name: minio
     runtime: image
     image: 
-      url: public.ecr.aws/bitnami/minio:2024.1.17
+      # Pinned to the specific tag you requested
+      url: public.ecr.aws/bitnami/minio:2025.10.15
     region: oregon
     plan: starter
     startCommand: minio server /data --console-address :9001
@@ -49,9 +50,10 @@ services:
     name: langfuse-worker
     runtime: image
     image:
-      url: langfuse/langfuse-worker:3.145.0
+      url: langfuse/langfuse-worker:3.122.0
     region: oregon
     plan: starter
+    # STARTUP SCRIPT: Waits for DB/Clickhouse/Minio connectivity
     startCommand: >
       /bin/sh -c '
       echo "--- Checking Dependencies ---";
@@ -67,21 +69,17 @@ services:
       
       node dist/worker.js'
     envVars:
+      # RAW VARS FOR START SCRIPT
       - key: DB_HOST
         fromDatabase: {name: langfuse-postgres, property: host}
-      
-      # FIX: Added 'type: pserv'
       - key: CH_HOST
         fromService: {type: pserv, name: clickhouse, property: host}
-      
-      # FIX: Added 'type: pserv'
       - key: CH_PASS
         fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
-      
-      # FIX: Added 'type: pserv'
       - key: MINIO_HOST
         fromService: {type: pserv, name: minio, property: host}
       
+      # LANGFUSE CONFIG
       - key: DATABASE_URL
         fromDatabase:
           name: langfuse-postgres
@@ -93,11 +91,8 @@ services:
           property: connectionString
       - key: CLICKHOUSE_USER
         value: default
-      
-      # FIX: Added 'type: pserv'
       - key: CLICKHOUSE_PASSWORD 
         fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
-        
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
@@ -125,10 +120,11 @@ services:
     name: langfuse-web
     runtime: image
     image:
-      url: langfuse/langfuse:3.145.0
+      url: langfuse/langfuse:3.122.0
     region: oregon
     plan: standard
     healthCheckPath: /api/public/health
+    # STARTUP SCRIPT: Waits for DB/Clickhouse/Minio connectivity
     startCommand: >
       /bin/sh -c '
       echo "--- Checking Dependencies ---";
@@ -144,21 +140,17 @@ services:
       
       npm run start'
     envVars:
+      # RAW VARS FOR START SCRIPT
       - key: DB_HOST
         fromDatabase: {name: langfuse-postgres, property: host}
-        
-      # FIX: Added 'type: pserv'
       - key: CH_HOST
         fromService: {type: pserv, name: clickhouse, property: host}
-        
-      # FIX: Added 'type: pserv'
       - key: CH_PASS
         fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
-        
-      # FIX: Added 'type: pserv'
       - key: MINIO_HOST
         fromService: {type: pserv, name: minio, property: host}
 
+      # LANGFUSE CONFIG
       - key: NEXTAUTH_URL
         value: https://langfuse-web.onrender.com 
       - key: NEXTAUTH_SECRET
@@ -174,11 +166,8 @@ services:
           property: connectionString
       - key: CLICKHOUSE_USER
         value: default
-        
-      # FIX: Added 'type: pserv'
       - key: CLICKHOUSE_PASSWORD
         fromService: {type: pserv, name: clickhouse, envVarKey: CLICKHOUSE_PASSWORD}
-        
       - key: CLICKHOUSE_CLUSTER_ENABLED
         value: "false"
       - key: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
