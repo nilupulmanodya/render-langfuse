@@ -1,6 +1,6 @@
 services:
   # -------------------------------------------------------
-  # 1. MinIO (S3 Storage) - Starts First
+  # 1. MinIO (S3 Storage)
   # -------------------------------------------------------
   - type: pserv
     name: minio
@@ -9,19 +9,17 @@ services:
       url: public.ecr.aws/bitnami/minio:latest
     region: oregon
     plan: starter
-    # SAFETY CONFIG:
-    # 1. We force PORT to 9000 so it never randomizes to 10000.
-    # 2. We use MINIO_DEFAULT_BUCKETS to auto-create the 'langfuse' bucket.
+    # IMPROVEMENT: Removed manual startCommand so auto-setup works
     envVars:
       - key: MINIO_ROOT_USER
         value: minio
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
-      - key: MINIO_DEFAULT_BUCKETS
+      - key: MINIO_DEFAULT_BUCKETS  # Auto-creates 'langfuse' bucket
         value: "langfuse"
       - key: MINIO_DATA_DIR
         value: "/data"
-      - key: PORT  # <--- FORCE STABLE PORT
+      - key: PORT                   # Forces port 9000 (Stable)
         value: "9000"
     disk:
       name: minio-data
@@ -29,33 +27,29 @@ services:
       sizeGB: 10
 
   # -------------------------------------------------------
-  # 2. ClickHouse (Analytics DB) - FIXED
+  # 2. ClickHouse (Analytics DB)
   # -------------------------------------------------------
   - type: pserv
     name: clickhouse
     runtime: image
     image:
-      # Switched to Bitnami for better Render compatibility
-      url: bitnami/clickhouse:latest
+      url: clickhouse/clickhouse-server:latest
     region: oregon
     plan: standard
+    # SAFETY FIX: Bypass the entrypoint script to prevent "Operation not permitted" crash
+    startCommand: "/usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml"
     envVars:
       - key: CLICKHOUSE_DB
         value: default
-      
-      # BITNAMI SPECIFIC:
-      # Use this to set the password for the 'default' user.
-      - key: CLICKHOUSE_ADMIN_PASSWORD
+      - key: CLICKHOUSE_USER
+        value: default
+      - key: CLICKHOUSE_PASSWORD
         value: langfuse_secure_password
-      
-      # Note: We REMOVED 'CLICKHOUSE_USER' because we are using 
-      # the built-in 'default' user, which Bitnami configures automatically.
-      
-      - key: PORT
+      - key: PORT                   # Forces port 8123 (Stable)
         value: "8123"
     disk:
       name: clickhouse-data
-      mountPath: /bitnami/clickhouse
+      mountPath: /var/lib/clickhouse
       sizeGB: 10
 
   # -------------------------------------------------------
@@ -78,9 +72,7 @@ services:
           type: redis
           name: langfuse-redis
           property: connectionString
-      # STABLE HOSTNAMES:
-      # Because we named the services 'clickhouse' and 'minio' above,
-      # and forced the ports, these URLs are now guaranteed to work.
+      # STABLE URLS (Thanks to forced ports above)
       - key: CLICKHOUSE_URL
         value: http://clickhouse:8123
       - key: CLICKHOUSE_USER
@@ -180,23 +172,17 @@ services:
     envVars:
       - key: PORT
         value: 4000
-      
       # ENABLE OTEL TRACING (JSON FORMAT REQUIRED)
       - key: LITELLM_CALLBACKS
         value: '["langfuse_otel"]'
-
-      # --- SECRETS (You MUST add these in Dashboard later) ---
-      
-      # URL Example: https://langfuse-web-xxxx.onrender.com/api/public/otel
+        
+      # --- SECRETS TO ADD IN DASHBOARD ---
       - key: LANGFUSE_OTEL_HOST
         sync: false
-
       - key: LANGFUSE_PUBLIC_KEY
         sync: false
       - key: LANGFUSE_SECRET_KEY
         sync: false
-        
-      # Master Key for Security
       - key: LITELLM_MASTER_KEY
         sync: false
 
