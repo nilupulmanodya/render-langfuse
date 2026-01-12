@@ -64,6 +64,14 @@ Pass flags to skip prompts:
 sudo ./setup.sh --token "hf_YourTokenHere" --model "google/gemma-2-2b-it"
 ```
 
+#### Quick remote install
+
+You can also download and run the remote deployment script in one line:
+
+```bash
+curl -L -o vllm-deployement.sh https://raw.githubusercontent.com/nilupulmanodya/render-langfuse/deployment/vllm/vllm-deployement.sh && chmod +x vllm-deployement.sh && ./vllm-deployement.sh
+```
+
 ---
 
 ## ⚙️ Flags
@@ -152,5 +160,3 @@ sudo systemctl restart vllm
 - **Web Server:** Caddy (reverse proxy on port 80)
 
 ---
-
-If you'd like, I can also add a short example `systemd` service snippet and a troubleshooting checklist. ✅
