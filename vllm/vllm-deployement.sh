@@ -9,6 +9,7 @@ HF_TOKEN=""
 MODEL_ID=""
 
 # --- 1. ARGUMENT PARSING ---
+# This allows users to pass args like: curl ... | bash -s -- --token x --model y
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -t|--token) HF_TOKEN="$2"; shift ;;
@@ -24,7 +25,8 @@ if [[ -z "$HF_TOKEN" ]]; then
     echo ">>> CONFIGURATION REQUIRED"
     echo "--------------------------------------------------------"
     echo "Please enter your Hugging Face Token (starts with hf_...)"
-    read -s -p "HF Token: " HF_TOKEN
+    # FIX: < /dev/tty allows reading from keyboard even during a curl | bash pipe
+    read -s -p "HF Token: " HF_TOKEN < /dev/tty
     echo ""
 fi
 
@@ -37,7 +39,8 @@ if [[ -z "$MODEL_ID" ]]; then
     echo "--------------------------------------------------------"
     echo "Which model do you want to load?"
     echo "Press [ENTER] to use default: $DEFAULT_MODEL"
-    read -p "Model ID: " USER_MODEL_INPUT
+    # FIX: < /dev/tty allows reading from keyboard even during a curl | bash pipe
+    read -p "Model ID: " USER_MODEL_INPUT < /dev/tty
     MODEL_ID="${USER_MODEL_INPUT:-$DEFAULT_MODEL}"
 fi
 
