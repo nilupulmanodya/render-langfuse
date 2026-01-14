@@ -6,7 +6,7 @@ services:
     name: minio
     runtime: image
     image: 
-      url: public.ecr.aws/bitnami/minio:2025.10.15
+      url: docker.io/nilupulmanodya/minio:2025.10.15
     region: oregon
     plan: starter
     startCommand: minio server /data --console-address :9001
